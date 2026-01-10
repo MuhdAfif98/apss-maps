@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -26,6 +27,8 @@
                             orange: '#f97316',
                             green: '#22c55e',
                             amber: '#eab308',
+                            sidebar: '#1e3a5f',
+                            sidebarHover: '#2563eb',
                         }
                     }
                 }
@@ -34,19 +37,19 @@
     </script>
     <style>
         body {
-            background: #0a1022;
+            background: #f3f4f6;
         }
-        
+
         .leaflet-container {
             background: #0f172a;
             font-family: 'Inter', sans-serif;
         }
-        
+
         /* Dark map tiles */
         .leaflet-tile-pane {
             filter: brightness(0.6) saturate(0.3) hue-rotate(180deg) invert(1);
         }
-        
+
         /* Custom popup */
         .leaflet-popup-content-wrapper {
             background: #1e293b;
@@ -54,202 +57,457 @@
             border-radius: 8px;
             color: #e2e8f0;
         }
-        
+
         .leaflet-popup-tip {
             background: #1e293b;
             border: 1px solid #334155;
         }
-        
+
         .leaflet-popup-content {
             margin: 0;
             font-family: 'Inter', sans-serif;
         }
-        
+
         /* Zoom controls */
         .leaflet-control-zoom a {
             background: #1e293b !important;
             color: #e2e8f0 !important;
             border-color: #334155 !important;
         }
-        
+
         .leaflet-control-zoom a:hover {
             background: #334155 !important;
         }
-        
+
         /* Aircraft marker */
         .aircraft-icon {
             cursor: pointer;
         }
-        
+
         .aircraft-icon:hover {
             filter: brightness(1.2);
         }
-        
-        /* Flight marker pulse */
-        @keyframes pulse-ring {
-            0% { transform: scale(0.8); opacity: 1; }
-            100% { transform: scale(2); opacity: 0; }
-        }
-        
-        .marker-pulse {
-            animation: pulse-ring 2s ease-out infinite;
-        }
-        
+
         /* Scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
+
         ::-webkit-scrollbar-track {
-            background: #1e293b;
+            background: #1e3a5f;
         }
+
         ::-webkit-scrollbar-thumb {
-            background: #475569;
+            background: #3b82f6;
             border-radius: 3px;
+        }
+
+        /* Sidebar nav active */
+        .nav-item.active {
+            background: #2563eb;
+        }
+
+        .nav-item:hover {
+            background: rgba(37, 99, 235, 0.2);
         }
     </style>
 </head>
-<body class="min-h-screen font-sans text-gray-200 overflow-hidden">
-    
-    <!-- Header -->
-    <header class="fixed top-0 left-0 right-0 z-50 bg-apss-dark border-b border-apss-border h-14 flex items-center px-6">
-        <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
-                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                </svg>
-            </div>
-            <div>
-                <span class="text-lg font-semibold text-white">M-APSS</span>
-                <span class="text-xs text-gray-500 ml-2">Live Map</span>
-            </div>
-        </div>
-        
-        <div class="ml-auto flex items-center gap-4">
-            <div class="flex items-center gap-2">
-                <span id="statusDot" class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span id="statusText" class="text-sm text-gray-400">Live</span>
-            </div>
-            <div id="lastUpdate" class="text-sm text-gray-500">--:--:--</div>
-        </div>
-    </header>
-    
-    <!-- Main Content -->
-    <div class="pt-14 h-screen flex">
-        
-        <!-- Map Container -->
-        <div class="flex-1 relative">
-            <div id="map" class="absolute inset-0"></div>
-            
-            <!-- Live Statistics Panel (Top Right) -->
-            <div class="absolute top-4 right-4 z-[1000] bg-apss-panel/95 backdrop-blur border border-apss-border rounded-lg p-4 min-w-[240px]">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-semibold text-white">Live Statistics</h3>
-                    <span class="text-xs text-gray-500" id="currentDate">--</span>
-                </div>
-                
-                <div class="space-y-2 text-sm">
-                    <div class="flex justify-between">
-                        <span class="text-gray-400">Total Flights:</span>
-                        <span id="aircraftCount" class="font-semibold text-white">0</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-gray-400">Active Alerts:</span>
-                        <span id="alertCount" class="font-semibold text-apss-red">0</span>
+
+<body class="min-h-screen font-sans bg-gray-100">
+    <!-- Main Layout -->
+    <div class="flex h-screen">
+
+        <!-- Left Sidebar -->
+        <aside class="w-64 bg-apss-sidebar text-white flex flex-col h-full overflow-y-auto">
+            <div class="flex-1 py-4">
+                <div class="px-4 mb-4">
+                    <div class="flex items-center gap-3">
+                        <img src="apss-logo.png" alt="M-APSS Logo" class="w-12">
+                        <img src="logo-title.svg" alt="M-APSS Logo" class="w-auto">
                     </div>
                 </div>
-                
-                <div class="mt-4 pt-3 border-t border-apss-border">
-                    <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Auto Refresh</div>
-                    <select id="refreshInterval" onchange="setRefreshInterval()" class="w-full bg-apss-dark border border-apss-border rounded px-2 py-1.5 text-sm text-gray-300 focus:border-apss-accent outline-none">
-                        <option value="0">Off</option>
-                        <option value="5000" selected>5 sec</option>
-                        <option value="10000">10 sec</option>
-                        <option value="30000">30 sec</option>
-                    </select>
+                <!-- COMMAND, CONTROL & OPS -->
+                <div class="mb-6">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">COMMAND, CONTROL
+                        & OPS</div>
+                    <nav class="space-y-1">
+                        <a href="#" class="nav-item active flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
+                                </path>
+                            </svg>
+                            ASOC Dashboard
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/command-control/flight-status"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                </path>
+                            </svg>
+                            Flight Status (Risk Tracker)
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/command-control/flight-radar"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7">
+                                </path>
+                            </svg>
+                            Flight Radar (Live Map)
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/command-control/xai-audit"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                                </path>
+                            </svg>
+                            XAI Model Audit
+                        </a>
+                    </nav>
+                </div>
+
+                <!-- PRE-TRAVEL INTELLIGENCE -->
+                <div class="mb-6">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">PRE-TRAVEL
+                        INTELLIGENCE</div>
+                    <nav class="space-y-1">
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/eta-portal"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z">
+                                </path>
+                            </svg>
+                            ETA Traveler App (Public)
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/eta"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z">
+                                </path>
+                            </svg>
+                            ETA Module (Admin)
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/advanced-search"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                            Advanced Search
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/risk-manager"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+                                </path>
+                            </svg>
+                            Risk Manager
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/case-management"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z">
+                                </path>
+                            </svg>
+                            Case Management
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/link-analysis"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1">
+                                </path>
+                            </svg>
+                            Link Analysis
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/traveler-module"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                            </svg>
+                            Traveler 360 View
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/risk-analytics"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                                </path>
+                            </svg>
+                            Risk Analytics
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/profiler"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z">
+                                </path>
+                            </svg>
+                            Profiler Module
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/watchlist-manager"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
+                                </path>
+                            </svg>
+                            Watch List Manager
+                        </a>
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/data-intelligence/identity-resolution"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 100-3m-3 3h6m-6-3h6m6 3h-1.5a1.5 1.5 0 100-3h1.5m-1.5-3h-1.5a1.5 1.5 0 100 3M17 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 100-3m-3 3h6m-6-3h6m6 3h-1.5a1.5 1.5 0 100-3h1.5m-1.5-3h-1.5a1.5 1.5 0 100 3">
+                                </path>
+                            </svg>
+                            Identity Resolution
+                        </a>
+                    </nav>
+                </div>
+
+                <!-- AT-AIRPORT SCREENING -->
+                <div class="mb-6">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">AT-AIRPORT
+                        SCREENING</div>
+                    <nav class="space-y-1">
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/admin/user-management"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z">
+                                </path>
+                            </svg>
+                            Screening Operations
+                        </a>
+                    </nav>
+                </div>
+
+                <!-- POST-TRAVEL INTELLIGENCE -->
+                <div class="mb-6">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">POST-TRAVEL
+                        INTELLIGENCE</div>
+                    <nav class="space-y-1">
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/admin/user-management"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z">
+                                </path>
+                            </svg>
+                            Post-Travel Analysis
+                        </a>
+                    </nav>
+                </div>
+
+                <!-- SYSTEM ADMINISTRATION -->
+                <div class="mb-6">
+                    <div class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">SYSTEM
+                        ADMINISTRATION</div>
+                    <nav class="space-y-1">
+                        <a href="https://tasstech-my.github.io/m-apss-eta-internal/#/admin/user-management"
+                            class="nav-item flex items-center gap-3 px-4 py-2.5 text-sm font-medium">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                                </path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            System Settings
+                        </a>
+                    </nav>
                 </div>
             </div>
-            
-            <!-- Category Legend (Left Side) -->
-            <div class="absolute top-4 left-4 z-[1000] bg-apss-panel/95 backdrop-blur border border-apss-border rounded-lg p-4 min-w-[180px]">
-                <h3 class="text-sm font-semibold text-white mb-3">Categories</h3>
-                
-                <div class="space-y-2">
-                    <label class="flex items-center gap-2 cursor-pointer group">
-                        <input type="checkbox" checked onchange="toggleCategory('normal')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-apss-accent focus:ring-apss-accent focus:ring-offset-0">
-                        <span class="w-2.5 h-2.5 rounded-full bg-apss-accent"></span>
-                        <span class="text-sm text-gray-300 flex-1">Normal</span>
-                        <span id="countNormal" class="text-xs text-gray-500">0</span>
-                    </label>
-                    
-                    <label class="flex items-center gap-2 cursor-pointer group">
-                        <input type="checkbox" checked onchange="toggleCategory('whitelist')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-green-500 focus:ring-green-500 focus:ring-offset-0">
-                        <span class="w-2.5 h-2.5 rounded-full bg-apss-green"></span>
-                        <span class="text-sm text-gray-300 flex-1">Whitelist</span>
-                        <span id="countWhitelist" class="text-xs text-gray-500">0</span>
-                    </label>
-                    
-                    <label class="flex items-center gap-2 cursor-pointer group">
-                        <input type="checkbox" checked onchange="toggleCategory('vip')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-amber-500 focus:ring-amber-500 focus:ring-offset-0">
-                        <span class="w-2.5 h-2.5 rounded-full bg-apss-amber"></span>
-                        <span class="text-sm text-gray-300 flex-1">VIP</span>
-                        <span id="countVip" class="text-xs text-gray-500">0</span>
-                    </label>
-                    
-                    <label class="flex items-center gap-2 cursor-pointer group">
-                        <input type="checkbox" checked onchange="toggleCategory('suspect')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-orange-500 focus:ring-orange-500 focus:ring-offset-0">
-                        <span class="w-2.5 h-2.5 rounded-full bg-apss-orange"></span>
-                        <span class="text-sm text-gray-300 flex-1">Suspect</span>
-                        <span id="countSuspect" class="text-xs text-gray-500">0</span>
-                    </label>
-                    
-                    <label class="flex items-center gap-2 cursor-pointer group">
-                        <input type="checkbox" checked onchange="toggleCategory('blacklist')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-red-500 focus:ring-red-500 focus:ring-offset-0">
-                        <span class="w-2.5 h-2.5 rounded-full bg-apss-red"></span>
-                        <span class="text-sm text-gray-300 flex-1">Blacklist</span>
-                        <span id="countBlacklist" class="text-xs text-gray-500">0</span>
-                    </label>
+
+            <!-- Profile Section at Bottom -->
+            <div class="px-4 py-4 border-t border-blue-600/30">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
+                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-white truncate">OP System Operator</div>
+                        <div class="text-xs text-gray-400 truncate">KUL Command Center</div>
+                    </div>
                 </div>
             </div>
-        </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col bg-gray-100 overflow-hidden">
+            <!-- Page Title -->
+            <div class="bg-white border-b border-gray-200 px-6 py-4 flex">
+                <h1 class="text-xl font-bold text-gray-900">ASOC Dashboard</h1>
+
+                <div class="ml-auto flex items-center gap-4">
+                    <!-- Notification Bell -->
+                    <div class="relative cursor-pointer">
+                        <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9">
+                            </path>
+                        </svg>
+                        <span
+                            class="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">3</span>
+                    </div>
+
+                    <!-- User Info -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-gray-700">sysadmin</span>
+                        <span class="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span class="text-sm text-gray-500">Online</span>
+                    </div>
+
+                    <!-- Logout -->
+                    <button class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                        <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Map Container -->
+            <div class="flex-1 relative bg-white m-4 rounded-lg shadow-sm overflow-hidden">
+                <div id="map" class="absolute inset-0"></div>
+
+                <!-- Live Statistics Panel (Top Right) -->
+                <div
+                    class="absolute top-4 right-4 z-[1000] bg-white/95 backdrop-blur border border-gray-200 rounded-lg p-4 min-w-[240px] shadow-lg">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-semibold text-gray-900">Live Statistics</h3>
+                        <span class="text-xs text-gray-500" id="currentDate">--</span>
+                    </div>
+
+                    <div class="space-y-2 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Total Flights:</span>
+                            <span id="aircraftCount" class="font-semibold text-gray-900">0</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-600">Active Alerts:</span>
+                            <span id="alertCount" class="font-semibold text-red-600">0</span>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t border-gray-200">
+                        <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Auto Refresh</div>
+                        <select id="refreshInterval" onchange="setRefreshInterval()"
+                            class="w-full bg-gray-50 border border-gray-200 rounded px-2 py-1.5 text-sm text-gray-700 focus:border-blue-500 outline-none">
+                            <option value="0">Off</option>
+                            <option value="5000" selected>5 sec</option>
+                            <option value="10000">10 sec</option>
+                            <option value="30000">30 sec</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Category Legend (Left Side) -->
+                <div
+                    class="absolute top-4 left-4 z-[1000] bg-white/95 backdrop-blur border border-gray-200 rounded-lg p-4 min-w-[180px] shadow-lg">
+                    <h3 class="text-sm font-semibold text-gray-900 mb-3">Categories</h3>
+
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" checked onchange="toggleCategory('normal')"
+                                class="w-3.5 h-3.5 rounded border-gray-300 bg-white text-blue-500 focus:ring-blue-500">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                            <span class="text-sm text-gray-700 flex-1">Normal</span>
+                            <span id="countNormal" class="text-xs text-gray-500">0</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" checked onchange="toggleCategory('whitelist')"
+                                class="w-3.5 h-3.5 rounded border-gray-300 bg-white text-green-500 focus:ring-green-500">
+                            <span class="w-2.5 h-2.5 rounded-full bg-green-500"></span>
+                            <span class="text-sm text-gray-700 flex-1">Whitelist</span>
+                            <span id="countWhitelist" class="text-xs text-gray-500">0</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" checked onchange="toggleCategory('vip')"
+                                class="w-3.5 h-3.5 rounded border-gray-300 bg-white text-amber-500 focus:ring-amber-500">
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+                            <span class="text-sm text-gray-700 flex-1">VIP</span>
+                            <span id="countVip" class="text-xs text-gray-500">0</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" checked onchange="toggleCategory('suspect')"
+                                class="w-3.5 h-3.5 rounded border-gray-300 bg-white text-orange-500 focus:ring-orange-500">
+                            <span class="w-2.5 h-2.5 rounded-full bg-orange-500"></span>
+                            <span class="text-sm text-gray-700 flex-1">Suspect</span>
+                            <span id="countSuspect" class="text-xs text-gray-500">0</span>
+                        </label>
+
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" checked onchange="toggleCategory('blacklist')"
+                                class="w-3.5 h-3.5 rounded border-gray-300 bg-white text-red-500 focus:ring-red-500">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                            <span class="text-sm text-gray-700 flex-1">Blacklist</span>
+                            <span id="countBlacklist" class="text-xs text-gray-500">0</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
-    
+
     <!-- Selected Flight Panel -->
-    <div id="flightPanel" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[2000] bg-apss-panel border border-apss-border rounded-xl p-5 min-w-[500px] hidden shadow-2xl">
-        <button onclick="closePanel()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors">
+    <div id="flightPanel"
+        class="fixed bottom-4 left-[calc(16rem+1rem)] right-4 z-[2000] bg-white border border-gray-200 rounded-xl p-5 min-w-[500px] hidden shadow-2xl">
+        <button onclick="closePanel()"
+            class="absolute top-3 right-3 text-gray-500 hover:text-gray-700 transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
         </button>
-        
+
         <div class="flex items-start gap-5">
             <div class="flex-1">
                 <!-- Header -->
                 <div class="flex items-center gap-3 mb-4">
-                    <div id="panelIcon" class="w-10 h-10 bg-apss-accent/20 rounded-lg flex items-center justify-center">
-                        <svg class="w-5 h-5 text-apss-accent" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                    <div id="panelIcon" class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                            <path
+                                d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" />
                         </svg>
                     </div>
                     <div>
                         <div class="flex items-center gap-2">
-                            <span id="panelCallsign" class="text-lg font-bold text-white">---</span>
+                            <span id="panelCallsign" class="text-lg font-bold text-gray-900">---</span>
                             <span id="panelCategory" class="text-xs font-medium px-2 py-0.5 rounded">---</span>
                         </div>
-                        <div class="flex items-center gap-2 text-sm text-gray-400">
+                        <div class="flex items-center gap-2 text-sm text-gray-500">
                             <span id="panelCountry">---</span>
                             <span>•</span>
-                            <span id="panelIcao" class="font-mono text-apss-accent">---</span>
+                            <span id="panelIcao" class="font-mono text-blue-600">---</span>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Person Info (only for non-normal) -->
                 <div id="panelPersonRow" class="mb-4 hidden">
                     <div id="panelPersonBox" class="rounded-lg p-3 border">
                         <div class="flex items-center gap-2 mb-1">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                <path
+                                    d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                             </svg>
                             <span id="panelPersonLabel" class="text-xs font-medium uppercase">Person</span>
                         </div>
@@ -257,35 +515,36 @@
                         <div id="panelPersonReason" class="text-sm mt-1 opacity-80">---</div>
                     </div>
                 </div>
-                
+
                 <!-- Flight Data Grid -->
                 <div class="grid grid-cols-4 gap-3">
-                    <div class="bg-apss-dark rounded-lg p-2.5">
+                    <div class="bg-gray-50 rounded-lg p-2.5">
                         <div class="text-[10px] text-gray-500 uppercase">Altitude</div>
-                        <div id="panelAltitude" class="text-sm font-semibold text-white">---</div>
+                        <div id="panelAltitude" class="text-sm font-semibold text-gray-900">---</div>
                     </div>
-                    <div class="bg-apss-dark rounded-lg p-2.5">
+                    <div class="bg-gray-50 rounded-lg p-2.5">
                         <div class="text-[10px] text-gray-500 uppercase">Speed</div>
-                        <div id="panelSpeed" class="text-sm font-semibold text-white">---</div>
+                        <div id="panelSpeed" class="text-sm font-semibold text-gray-900">---</div>
                     </div>
-                    <div class="bg-apss-dark rounded-lg p-2.5">
+                    <div class="bg-gray-50 rounded-lg p-2.5">
                         <div class="text-[10px] text-gray-500 uppercase">Heading</div>
-                        <div id="panelHeading" class="text-sm font-semibold text-white">---</div>
+                        <div id="panelHeading" class="text-sm font-semibold text-gray-900">---</div>
                     </div>
-                    <div class="bg-apss-dark rounded-lg p-2.5">
+                    <div class="bg-gray-50 rounded-lg p-2.5">
                         <div class="text-[10px] text-gray-500 uppercase">V/Rate</div>
-                        <div id="panelVRate" class="text-sm font-semibold text-white">---</div>
+                        <div id="panelVRate" class="text-sm font-semibold text-gray-900">---</div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
+
     <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 z-[3000] bg-apss-darker flex items-center justify-center">
+    <div id="loadingOverlay" class="fixed inset-0 z-[3000] bg-white flex items-center justify-center">
         <div class="text-center">
-            <div class="w-12 h-12 border-2 border-apss-accent border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p class="text-apss-accent font-medium">Loading M-APSS Data</p>
+            <div class="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4">
+            </div>
+            <p class="text-blue-600 font-medium">Loading M-APSS Data</p>
             <p class="text-gray-500 text-sm mt-1">Connecting to data source...</p>
         </div>
     </div>
@@ -298,20 +557,20 @@
             zoomControl: false,
             attributionControl: false
         });
-        
+
         // Dark map tiles
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 19
         }).addTo(map);
-        
+
         // Add zoom control to bottom right
         L.control.zoom({ position: 'bottomright' }).addTo(map);
-        
+
         // Aircraft markers layer
         let aircraftLayer = L.layerGroup().addTo(map);
         let refreshTimer = null;
         let selectedFlight = null;
-        
+
         // Category visibility
         const categoryVisibility = {
             normal: true,
@@ -320,7 +579,7 @@
             suspect: true,
             blacklist: true
         };
-        
+
         // Category colors matching APSS theme
         const categoryColors = {
             normal: '#3b82f6',      // blue
@@ -329,7 +588,7 @@
             suspect: '#f97316',     // orange
             blacklist: '#ef4444'    // red
         };
-        
+
         const categoryLabels = {
             normal: 'Normal',
             whitelist: 'Whitelist',
@@ -337,18 +596,18 @@
             suspect: 'Suspect',
             blacklist: 'Blacklist'
         };
-        
+
         const categoryStyles = {
-            normal: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-            whitelist: 'bg-green-500/20 text-green-400 border-green-500/30',
-            vip: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-            suspect: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-            blacklist: 'bg-red-500/20 text-red-400 border-red-500/30'
+            normal: 'bg-blue-100 text-blue-700 border-blue-200',
+            whitelist: 'bg-green-100 text-green-700 border-green-200',
+            vip: 'bg-amber-100 text-amber-700 border-amber-200',
+            suspect: 'bg-orange-100 text-orange-700 border-orange-200',
+            blacklist: 'bg-red-100 text-red-700 border-red-200'
         };
-        
+
         // Simulated flight category database
         const flightCategories = {};
-        
+
         // Dummy persons for each category
         const dummyPersons = {
             whitelist: [
@@ -400,15 +659,15 @@
                 { name: 'Zainuddin Mat', reason: 'Escaped maximum security prison' }
             ]
         };
-        
+
         function getFlightCategory(icao24) {
             if (flightCategories[icao24]) {
                 return flightCategories[icao24];
             }
-            
+
             const rand = Math.random();
             let category, person = null;
-            
+
             if (rand < 0.70) {
                 category = 'normal';
             } else if (rand < 0.82) {
@@ -424,25 +683,25 @@
                 category = 'blacklist';
                 person = dummyPersons.blacklist[Math.floor(Math.random() * dummyPersons.blacklist.length)];
             }
-            
+
             flightCategories[icao24] = { category, person };
             return flightCategories[icao24];
         }
-        
+
         // Region bounds - Malaysia
         const regions = {
             malaysia: { center: [4.5, 109], zoom: 6, bounds: [0.8, 99, 7.5, 119.5] }
         };
-        
+
         // Create aircraft icon for flights
         function createFlightIcon(heading, category, isSelected = false) {
             const color = categoryColors[category];
             const size = isSelected ? 26 : 20;
-            const glow = category === 'blacklist' ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.8))' : 
-                         category === 'suspect' ? 'drop-shadow(0 0 6px rgba(249, 115, 22, 0.6))' :
-                         category === 'vip' ? 'drop-shadow(0 0 4px rgba(234, 179, 8, 0.4))' :
-                         'drop-shadow(0 2px 3px rgba(0,0,0,0.3))';
-            
+            const glow = category === 'blacklist' ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.8))' :
+                category === 'suspect' ? 'drop-shadow(0 0 6px rgba(249, 115, 22, 0.6))' :
+                    category === 'vip' ? 'drop-shadow(0 0 4px rgba(234, 179, 8, 0.4))' :
+                        'drop-shadow(0 2px 3px rgba(0,0,0,0.3))';
+
             return L.divIcon({
                 html: `
                     <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" style="transform: rotate(${(heading || 0) + 45}deg); filter: ${glow};">
@@ -451,44 +710,44 @@
                 `,
                 className: 'aircraft-icon',
                 iconSize: [size, size],
-                iconAnchor: [size/2, size/2]
+                iconAnchor: [size / 2, size / 2]
             });
         }
-        
+
         // Toggle category visibility
         function toggleCategory(category) {
             categoryVisibility[category] = !categoryVisibility[category];
             refreshData();
         }
-        
+
         // Persistent dummy flights storage
         let dummyFlightsData = null;
         let lastUpdateTime = null;
-        
+
         // Initialize dummy flights once
         function initDummyFlights() {
             const airlines = ['MAS', 'AXM', 'MXD', 'FYS', 'ODB', 'XAX', 'BTK'];
             const countries = ['Malaysia', 'Singapore', 'Thailand', 'Indonesia', 'China', 'Australia', 'Japan'];
             const flights = [];
-            
+
             const numFlights = 25 + Math.floor(Math.random() * 15);
-            
+
             for (let i = 0; i < numFlights; i++) {
                 const airline = airlines[Math.floor(Math.random() * airlines.length)];
                 const flightNum = Math.floor(Math.random() * 9000) + 100;
                 const callsign = `${airline}${flightNum}`;
                 const icao24 = Math.random().toString(16).substr(2, 6);
-                
+
                 const lat = 1 + Math.random() * 6;
                 const lon = 100 + Math.random() * 18;
-                
+
                 const altitude = Math.random() > 0.1 ? 5000 + Math.random() * 35000 : 0;
                 const velocity = altitude > 0 ? 150 + Math.random() * 400 : 0;
                 const track = Math.random() * 360;
                 const vRate = altitude > 0 ? (Math.random() - 0.5) * 20 : 0;
                 const onGround = altitude === 0;
                 const country = countries[Math.floor(Math.random() * countries.length)];
-                
+
                 flights.push({
                     icao24,
                     callsign,
@@ -502,33 +761,33 @@
                     onGround
                 });
             }
-            
+
             return flights;
         }
-        
+
         function updateDummyFlights() {
             if (!dummyFlightsData) {
                 dummyFlightsData = initDummyFlights();
                 lastUpdateTime = Date.now();
                 return getDummyFlightsAsStates();
             }
-            
+
             const now = Date.now();
             const deltaSeconds = (now - lastUpdateTime) / 1000;
             lastUpdateTime = now;
-            
+
             dummyFlightsData = dummyFlightsData.map(flight => {
                 if (flight.onGround) return flight;
-                
+
                 const speedDegPerSec = (flight.velocity * 0.0003);
                 const distance = speedDegPerSec * deltaSeconds;
                 const headingRad = flight.track * (Math.PI / 180);
-                
+
                 let newLat = flight.lat + (distance * Math.cos(headingRad));
                 let newLon = flight.lon + (distance * Math.sin(headingRad));
-                
+
                 const [lamin, lomin, lamax, lomax] = regions.malaysia.bounds;
-                
+
                 if (newLat < lamin || newLat > lamax || newLon < lomin || newLon > lomax) {
                     if (newLat < lamin) newLat = lamax - 0.5;
                     if (newLat > lamax) newLat = lamin + 0.5;
@@ -536,99 +795,80 @@
                     if (newLon > lomax) newLon = lomin + 0.5;
                     flight.track = Math.random() * 360;
                 }
-                
+
                 return { ...flight, lat: newLat, lon: newLon };
             });
-            
+
             return getDummyFlightsAsStates();
         }
-        
+
         function getDummyFlightsAsStates() {
             return dummyFlightsData.map(f => [
-                f.icao24, f.callsign, f.country, Date.now()/1000, Date.now()/1000,
+                f.icao24, f.callsign, f.country, Date.now() / 1000, Date.now() / 1000,
                 f.lon, f.lat, f.altitude * 0.3048, f.onGround,
                 f.velocity * 0.514, f.track, f.vRate * 0.00508
             ]);
         }
-        
+
         // OpenSky API credentials
         const OPENSKY_USERNAME = 'ceks98';
         const OPENSKY_PASSWORD = 'az8eOP6uVvbQDPrVo0wqrMvLPVZitXV7';
-        
+
         async function fetchFlights() {
             const [lamin, lomin, lamax, lomax] = regions.malaysia.bounds;
             const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
             const url = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
-            
+
             try {
                 console.log('Fetching from OpenSky API via proxy...');
                 const response = await fetch(url);
-                
+
                 console.log('Response status:', response.status);
-                
+
                 if (!response.ok) {
                     throw new Error(`API request failed: ${response.status}`);
                 }
-                
+
                 const data = await response.json();
                 const flights = data.states || [];
-                
+
                 if (flights.length === 0) {
                     console.log('No flights in Malaysia airspace, using simulated flights');
-                    updateDataSourceStatus(false, 'No flights in area');
                     return updateDummyFlights();
                 }
-                
+
                 dummyFlightsData = null;
-                updateDataSourceStatus(true);
                 console.log(`Fetched ${flights.length} real flights`);
                 return flights;
             } catch (error) {
                 console.error('Fetch error:', error.message);
-                updateDataSourceStatus(false, error.message);
                 return updateDummyFlights();
             }
         }
-        
-        function updateDataSourceStatus(isRealData, reason = '') {
-            const dot = document.getElementById('statusDot');
-            const text = document.getElementById('statusText');
-            
-            if (isRealData) {
-                dot.className = 'w-2 h-2 bg-green-500 rounded-full animate-pulse';
-                text.textContent = 'Live';
-                text.className = 'text-sm text-green-400';
-            } else {
-                dot.className = 'w-2 h-2 bg-amber-500 rounded-full animate-pulse';
-                text.textContent = 'Simulated';
-                text.className = 'text-sm text-amber-400';
-            }
-            text.title = reason || '';
-        }
-        
+
         async function refreshData() {
             const flights = await fetchFlights();
             aircraftLayer.clearLayers();
-            
+
             const counts = { normal: 0, whitelist: 0, vip: 0, suspect: 0, blacklist: 0 };
             let alertCount = 0;
-            
+
             flights.forEach(state => {
                 const [icao24, callsign, country, timePos, lastContact, lon, lat, baroAlt, onGround, velocity, track, vRate] = state;
-                
+
                 if (lat && lon) {
                     const { category, person } = getFlightCategory(icao24);
                     counts[category]++;
-                    
+
                     if (category === 'blacklist' || category === 'suspect') {
                         alertCount++;
                     }
-                    
+
                     if (!categoryVisibility[category]) return;
-                    
+
                     const isSelected = selectedFlight && selectedFlight.icao24 === icao24;
                     const heading = track ? track : 0;
-                    
+
                     const flightData = {
                         icao24,
                         callsign: callsign?.trim() || 'N/A',
@@ -644,34 +884,34 @@
                         vRate: vRate ? Math.round(vRate * 196.85) : null,
                         onGround
                     };
-                    
+
                     const marker = L.marker([lat, lon], {
                         icon: createFlightIcon(heading, category, isSelected),
                         zIndexOffset: category === 'blacklist' ? 1000 : category === 'suspect' ? 500 : 0
                     });
-                    
+
                     marker.on('click', () => selectFlight(flightData));
-                    
+
                     const categoryBadge = `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryStyles[category]}">${categoryLabels[category]}</span>`;
-                    
+
                     marker.bindTooltip(`
                         <div class="p-2">
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="font-bold text-white">${flightData.callsign}</span>
+                                <span class="font-bold text-gray-900">${flightData.callsign}</span>
                                 ${categoryBadge}
                             </div>
-                            <div class="text-xs text-gray-400">${flightData.altitude ? flightData.altitude.toLocaleString() + ' ft' : 'Ground'}</div>
+                            <div class="text-xs text-gray-600">${flightData.altitude ? flightData.altitude.toLocaleString() + ' ft' : 'Ground'}</div>
                         </div>
                     `, { direction: 'top', offset: [0, -10] });
-                    
+
                     aircraftLayer.addLayer(marker);
-                    
+
                     if (isSelected) {
                         updatePanel(flightData);
                     }
                 }
             });
-            
+
             // Update stats
             document.getElementById('aircraftCount').textContent = flights.length;
             document.getElementById('alertCount').textContent = alertCount;
@@ -680,12 +920,11 @@
             document.getElementById('countVip').textContent = counts.vip;
             document.getElementById('countSuspect').textContent = counts.suspect;
             document.getElementById('countBlacklist').textContent = counts.blacklist;
-            document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
             document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-GB');
-            
+
             document.getElementById('loadingOverlay').classList.add('hidden');
         }
-        
+
         function selectFlight(flightData) {
             selectedFlight = flightData;
             updatePanel(flightData);
@@ -693,7 +932,7 @@
             map.panTo([flightData.lat, flightData.lon]);
             refreshData();
         }
-        
+
         function updatePanel(data) {
             document.getElementById('panelCallsign').textContent = data.callsign;
             document.getElementById('panelCountry').textContent = data.country;
@@ -702,73 +941,74 @@
             document.getElementById('panelSpeed').textContent = data.speed ? `${data.speed} kts` : '---';
             document.getElementById('panelHeading').textContent = data.heading !== null ? `${data.heading}°` : '---';
             document.getElementById('panelVRate').textContent = data.vRate ? `${data.vRate > 0 ? '+' : ''}${data.vRate}` : '---';
-            
+
             // Category badge
             const categoryEl = document.getElementById('panelCategory');
             categoryEl.textContent = categoryLabels[data.category];
             categoryEl.className = `text-xs font-medium px-2 py-0.5 rounded ${categoryStyles[data.category]}`;
-            
+
             // Person info
             const personRow = document.getElementById('panelPersonRow');
             const personBox = document.getElementById('panelPersonBox');
             const personLabel = document.getElementById('panelPersonLabel');
             const personNameEl = document.getElementById('panelPersonName');
             const personReasonEl = document.getElementById('panelPersonReason');
-            
+
             if (data.personName) {
                 personRow.classList.remove('hidden');
                 personNameEl.textContent = data.personName;
                 personReasonEl.textContent = data.personReason;
-                
+
                 const personStyles = {
-                    whitelist: { box: 'bg-green-500/10 border-green-500/30 text-green-400', label: 'Whitelisted' },
-                    vip: { box: 'bg-amber-500/10 border-amber-500/30 text-amber-400', label: 'VIP' },
-                    suspect: { box: 'bg-orange-500/10 border-orange-500/30 text-orange-400', label: 'Suspect' },
-                    blacklist: { box: 'bg-red-500/10 border-red-500/30 text-red-400', label: 'Blacklisted' }
+                    whitelist: { box: 'bg-green-50 border-green-200 text-green-800', label: 'Whitelisted' },
+                    vip: { box: 'bg-amber-50 border-amber-200 text-amber-800', label: 'VIP' },
+                    suspect: { box: 'bg-orange-50 border-orange-200 text-orange-800', label: 'Suspect' },
+                    blacklist: { box: 'bg-red-50 border-red-200 text-red-800', label: 'Blacklisted' }
                 };
-                
+
                 const style = personStyles[data.category];
                 personBox.className = `rounded-lg p-3 border ${style.box}`;
                 personLabel.textContent = style.label;
             } else {
                 personRow.classList.add('hidden');
             }
-            
+
             // Icon color
             const iconEl = document.getElementById('panelIcon');
             const iconColors = {
-                normal: 'bg-blue-500/20 text-blue-400',
-                whitelist: 'bg-green-500/20 text-green-400',
-                vip: 'bg-amber-500/20 text-amber-400',
-                suspect: 'bg-orange-500/20 text-orange-400',
-                blacklist: 'bg-red-500/20 text-red-400'
+                normal: 'bg-blue-100 text-blue-600',
+                whitelist: 'bg-green-100 text-green-600',
+                vip: 'bg-amber-100 text-amber-600',
+                suspect: 'bg-orange-100 text-orange-600',
+                blacklist: 'bg-red-100 text-red-600'
             };
             iconEl.className = `w-10 h-10 ${iconColors[data.category]} rounded-lg flex items-center justify-center`;
         }
-        
+
         function closePanel() {
             document.getElementById('flightPanel').classList.add('hidden');
             selectedFlight = null;
             refreshData();
         }
-        
+
         function setRefreshInterval() {
             const interval = parseInt(document.getElementById('refreshInterval').value);
-            
+
             if (refreshTimer) {
                 clearInterval(refreshTimer);
                 refreshTimer = null;
             }
-            
+
             if (interval > 0) {
                 refreshTimer = setInterval(refreshData, interval);
             }
         }
-        
+
         document.addEventListener('DOMContentLoaded', () => {
             refreshData();
             setRefreshInterval();
         });
     </script>
 </body>
+
 </html>
