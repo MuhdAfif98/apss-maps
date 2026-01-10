@@ -3,25 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Flight Tracker</title>
+    <title>Flight Radar - APSS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
-                        sans: ['DM Sans', 'sans-serif'],
+                        sans: ['Inter', 'sans-serif'],
                     },
                     colors: {
-                        sky: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
+                        apss: {
+                            dark: '#0f172a',
+                            darker: '#0a1022',
+                            panel: '#1e293b',
+                            border: '#334155',
+                            accent: '#3b82f6',
+                            red: '#ef4444',
+                            orange: '#f97316',
+                            green: '#22c55e',
+                            amber: '#eab308',
                         }
                     }
                 }
@@ -30,275 +34,273 @@
     </script>
     <style>
         body {
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%);
+            background: #0a1022;
         }
         
         .leaflet-container {
-            font-family: 'DM Sans', sans-serif;
+            background: #0f172a;
+            font-family: 'Inter', sans-serif;
         }
         
-        /* Aircraft marker */
-        .aircraft-marker {
-            transition: transform 0.2s ease;
-        }
-        
-        .aircraft-marker:hover {
-            transform: scale(1.2);
+        /* Dark map tiles */
+        .leaflet-tile-pane {
+            filter: brightness(0.6) saturate(0.3) hue-rotate(180deg) invert(1);
         }
         
         /* Custom popup */
         .leaflet-popup-content-wrapper {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            color: #e2e8f0;
         }
         
         .leaflet-popup-tip {
-            background: white;
+            background: #1e293b;
+            border: 1px solid #334155;
         }
         
         .leaflet-popup-content {
             margin: 0;
-            font-family: 'DM Sans', sans-serif;
+            font-family: 'Inter', sans-serif;
         }
         
-        /* Card shadows */
-        .card-shadow {
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        /* Zoom controls */
+        .leaflet-control-zoom a {
+            background: #1e293b !important;
+            color: #e2e8f0 !important;
+            border-color: #334155 !important;
         }
         
-        /* Smooth animations */
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-3px); }
+        .leaflet-control-zoom a:hover {
+            background: #334155 !important;
         }
         
-        .float-animation {
-            animation: float 3s ease-in-out infinite;
+        /* Aircraft marker */
+        .aircraft-icon {
+            cursor: pointer;
         }
         
-        @keyframes pulse-border {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
-            50% { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.1); }
+        .aircraft-icon:hover {
+            filter: brightness(1.2);
         }
         
-        .pulse-danger {
-            animation: pulse-border 2s ease-in-out infinite;
+        /* Flight marker pulse */
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+        
+        .marker-pulse {
+            animation: pulse-ring 2s ease-out infinite;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
         }
     </style>
 </head>
-<body class="min-h-screen font-sans text-gray-800 overflow-hidden">
+<body class="min-h-screen font-sans text-gray-200 overflow-hidden">
     
     <!-- Header -->
-    <header class="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-200">
-        <div class="flex items-center justify-between px-6 py-3">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-sky-500 rounded-xl flex items-center justify-center">
-                    <svg class="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h1 class="text-xl font-bold text-gray-900">Flight Tracker</h1>
-                    <p class="text-xs text-sky-600 font-medium">Real-time Aviation Data</p>
-                </div>
+    <header class="fixed top-0 left-0 right-0 z-50 bg-apss-dark border-b border-apss-border h-14 flex items-center px-6">
+        <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
             </div>
-            
-            <!-- Status -->
-            <div class="flex items-center gap-6">
-                <div class="flex items-center gap-2">
-                    <span id="statusDot" class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                    <span id="statusText" class="text-sm font-medium text-gray-600">Live</span>
-                </div>
-                <div id="lastUpdate" class="text-sm text-gray-500">--:--:--</div>
+            <div>
+                <span class="text-lg font-semibold text-white">Flight Radar</span>
+                <span class="text-xs text-gray-500 ml-2">Live Map</span>
             </div>
+        </div>
+        
+        <div class="ml-auto flex items-center gap-4">
+            <div class="flex items-center gap-2">
+                <span id="statusDot" class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                <span id="statusText" class="text-sm text-gray-400">Live</span>
+            </div>
+            <div id="lastUpdate" class="text-sm text-gray-500">--:--:--</div>
         </div>
     </header>
     
-    <!-- Stats Bar -->
-    <div class="fixed top-20 left-6 z-40 flex flex-col gap-3 max-h-[calc(100vh-120px)] overflow-y-auto">
-        <div class="card-shadow bg-white rounded-xl px-4 py-3 border border-gray-100">
-            <div class="text-xs text-gray-500 font-medium uppercase tracking-wider">Aircraft Tracked</div>
-            <div id="aircraftCount" class="text-2xl font-bold text-sky-600">0</div>
-        </div>
-        <div class="card-shadow bg-white rounded-xl px-4 py-3 border border-gray-100">
-            <div class="text-xs text-gray-500 font-medium uppercase tracking-wider">Coverage</div>
-            <div class="text-lg font-semibold text-gray-800">Asia</div>
-        </div>
+    <!-- Main Content -->
+    <div class="pt-14 h-screen flex">
         
-        <!-- Category Legend -->
-        <div class="card-shadow bg-white rounded-xl px-4 py-3 border border-gray-100">
-            <div class="text-xs text-gray-500 font-medium uppercase tracking-wider mb-3">Categories</div>
+        <!-- Map Container -->
+        <div class="flex-1 relative">
+            <div id="map" class="absolute inset-0"></div>
             
-            <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg">
-                <input type="checkbox" checked onchange="toggleCategory('normal')" class="w-4 h-4 rounded text-sky-500 focus:ring-sky-400">
-                <span class="w-3 h-3 rounded-full bg-sky-500"></span>
-                <span class="text-sm text-gray-700 flex-1">Normal</span>
-                <span id="countNormal" class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">0</span>
-            </label>
-            
-            <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg">
-                <input type="checkbox" checked onchange="toggleCategory('whitelist')" class="w-4 h-4 rounded text-emerald-500 focus:ring-emerald-400">
-                <span class="w-3 h-3 rounded-full bg-emerald-500"></span>
-                <span class="text-sm text-gray-700 flex-1">Whitelist</span>
-                <span id="countWhitelist" class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">0</span>
-            </label>
-            
-            <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg">
-                <input type="checkbox" checked onchange="toggleCategory('vip')" class="w-4 h-4 rounded text-amber-500 focus:ring-amber-400">
-                <span class="w-3 h-3 rounded-full bg-amber-500"></span>
-                <span class="text-sm text-gray-700 flex-1">VIP</span>
-                <span id="countVip" class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">0</span>
-            </label>
-            
-            <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg">
-                <input type="checkbox" checked onchange="toggleCategory('suspect')" class="w-4 h-4 rounded text-orange-500 focus:ring-orange-400">
-                <span class="w-3 h-3 rounded-full bg-orange-500"></span>
-                <span class="text-sm text-gray-700 flex-1">Suspect</span>
-                <span id="countSuspect" class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">0</span>
-            </label>
-            
-            <label class="flex items-center gap-3 py-2 cursor-pointer hover:bg-gray-50 -mx-2 px-2 rounded-lg">
-                <input type="checkbox" checked onchange="toggleCategory('blacklist')" class="w-4 h-4 rounded text-red-500 focus:ring-red-400">
-                <span class="w-3 h-3 rounded-full bg-red-600"></span>
-                <span class="text-sm text-gray-700 flex-1">Blacklist</span>
-                <span id="countBlacklist" class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">0</span>
-            </label>
-        </div>
-    </div>
-    
-    <!-- Controls -->
-    <div class="fixed top-20 right-6 z-40 flex flex-col gap-3">
-        <button onclick="refreshData()" class="card-shadow bg-white rounded-xl px-4 py-3 border border-gray-100 hover:bg-sky-50 hover:border-sky-200 transition-all group">
-            <div class="flex items-center gap-2">
-                <svg id="refreshIcon" class="w-5 h-5 text-sky-600 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                </svg>
-                <span class="text-sm font-medium text-gray-700">Refresh</span>
+            <!-- Live Statistics Panel (Top Right) -->
+            <div class="absolute top-4 right-4 z-[1000] bg-apss-panel/95 backdrop-blur border border-apss-border rounded-lg p-4 min-w-[240px]">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-semibold text-white">Live Statistics</h3>
+                    <span class="text-xs text-gray-500" id="currentDate">--</span>
+                </div>
+                
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Total Flights:</span>
+                        <span id="aircraftCount" class="font-semibold text-white">0</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Active Alerts:</span>
+                        <span id="alertCount" class="font-semibold text-apss-red">0</span>
+                    </div>
+                </div>
+                
+                <div class="mt-4 pt-3 border-t border-apss-border">
+                    <div class="text-xs text-gray-500 uppercase tracking-wider mb-2">Auto Refresh</div>
+                    <select id="refreshInterval" onchange="setRefreshInterval()" class="w-full bg-apss-dark border border-apss-border rounded px-2 py-1.5 text-sm text-gray-300 focus:border-apss-accent outline-none">
+                        <option value="0">Off</option>
+                        <option value="5000" selected>5 sec</option>
+                        <option value="10000">10 sec</option>
+                        <option value="30000">30 sec</option>
+                    </select>
+                </div>
             </div>
-        </button>
-        
-        <div class="card-shadow bg-white rounded-xl px-4 py-3 border border-gray-100">
-            <label class="text-xs text-gray-500 font-medium uppercase tracking-wider block mb-2">Auto Refresh</label>
-            <select id="refreshInterval" onchange="setRefreshInterval()" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:border-sky-400 focus:ring-2 focus:ring-sky-100 outline-none transition-all">
-                <option value="0">Off</option>
-                <option value="5000" selected>5 sec</option>
-                <option value="10000">10 sec</option>
-                <option value="30000">30 sec</option>
-                <option value="60000">1 min</option>
-            </select>
+            
+            <!-- Category Legend (Left Side) -->
+            <div class="absolute top-4 left-4 z-[1000] bg-apss-panel/95 backdrop-blur border border-apss-border rounded-lg p-4 min-w-[180px]">
+                <h3 class="text-sm font-semibold text-white mb-3">Categories</h3>
+                
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="checkbox" checked onchange="toggleCategory('normal')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-apss-accent focus:ring-apss-accent focus:ring-offset-0">
+                        <span class="w-2.5 h-2.5 rounded-full bg-apss-accent"></span>
+                        <span class="text-sm text-gray-300 flex-1">Normal</span>
+                        <span id="countNormal" class="text-xs text-gray-500">0</span>
+                    </label>
+                    
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="checkbox" checked onchange="toggleCategory('whitelist')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-green-500 focus:ring-green-500 focus:ring-offset-0">
+                        <span class="w-2.5 h-2.5 rounded-full bg-apss-green"></span>
+                        <span class="text-sm text-gray-300 flex-1">Whitelist</span>
+                        <span id="countWhitelist" class="text-xs text-gray-500">0</span>
+                    </label>
+                    
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="checkbox" checked onchange="toggleCategory('vip')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-amber-500 focus:ring-amber-500 focus:ring-offset-0">
+                        <span class="w-2.5 h-2.5 rounded-full bg-apss-amber"></span>
+                        <span class="text-sm text-gray-300 flex-1">VIP</span>
+                        <span id="countVip" class="text-xs text-gray-500">0</span>
+                    </label>
+                    
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="checkbox" checked onchange="toggleCategory('suspect')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-orange-500 focus:ring-orange-500 focus:ring-offset-0">
+                        <span class="w-2.5 h-2.5 rounded-full bg-apss-orange"></span>
+                        <span class="text-sm text-gray-300 flex-1">Suspect</span>
+                        <span id="countSuspect" class="text-xs text-gray-500">0</span>
+                    </label>
+                    
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="checkbox" checked onchange="toggleCategory('blacklist')" class="w-3.5 h-3.5 rounded border-gray-600 bg-apss-dark text-red-500 focus:ring-red-500 focus:ring-offset-0">
+                        <span class="w-2.5 h-2.5 rounded-full bg-apss-red"></span>
+                        <span class="text-sm text-gray-300 flex-1">Blacklist</span>
+                        <span id="countBlacklist" class="text-xs text-gray-500">0</span>
+                    </label>
+                </div>
+            </div>
         </div>
-        
     </div>
-    
-    <!-- Map Container -->
-    <div id="map" class="fixed inset-0 z-10"></div>
     
     <!-- Selected Flight Panel -->
-    <div id="flightPanel" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-white card-shadow rounded-2xl p-6 min-w-[480px] border border-gray-100 hidden">
-        <button onclick="closePanel()" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors">
+    <div id="flightPanel" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[2000] bg-apss-panel border border-apss-border rounded-xl p-5 min-w-[500px] hidden shadow-2xl">
+        <button onclick="closePanel()" class="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
             </svg>
         </button>
         
-        <div class="flex items-start gap-6">
+        <div class="flex items-start gap-5">
             <div class="flex-1">
+                <!-- Header -->
                 <div class="flex items-center gap-3 mb-4">
-                    <div id="panelIcon" class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center">
-                        <svg class="w-5 h-5 text-sky-600" fill="currentColor" viewBox="0 0 24 24">
+                    <div id="panelIcon" class="w-10 h-10 bg-apss-accent/20 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-apss-accent" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                         </svg>
                     </div>
                     <div>
-                        <span id="panelCallsign" class="text-xl font-bold text-gray-900">---</span>
-                        <span id="panelCountry" class="ml-2 text-sm text-gray-500 px-2 py-0.5 bg-gray-100 rounded-full">---</span>
-                    </div>
-                    <span id="panelCategory" class="ml-auto text-sm font-semibold px-3 py-1 rounded-full">---</span>
-                </div>
-                
-                <!-- Person Info (only shown for non-normal) -->
-                <div id="panelPersonRow" class="mb-3 hidden">
-                    <div id="panelPersonBox" class="rounded-lg p-3 border-2">
-                        <div class="flex items-start justify-between gap-4">
-                            <div class="flex-1">
-                                <div class="text-xs font-medium uppercase mb-1" id="panelPersonLabel">Person</div>
-                                <div id="panelPersonName" class="text-base font-bold">---</div>
-                            </div>
+                        <div class="flex items-center gap-2">
+                            <span id="panelCallsign" class="text-lg font-bold text-white">---</span>
+                            <span id="panelCategory" class="text-xs font-medium px-2 py-0.5 rounded">---</span>
                         </div>
-                        <div class="mt-2 pt-2 border-t border-current/10">
-                            <div class="text-xs font-medium uppercase mb-1 opacity-70">Reason</div>
-                            <div id="panelPersonReason" class="text-sm">---</div>
+                        <div class="flex items-center gap-2 text-sm text-gray-400">
+                            <span id="panelCountry">---</span>
+                            <span>•</span>
+                            <span id="panelIcao" class="font-mono text-apss-accent">---</span>
                         </div>
                     </div>
                 </div>
                 
-                <div class="grid grid-cols-3 gap-3">
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="text-xs text-gray-500 font-medium uppercase">Altitude</div>
-                        <div id="panelAltitude" class="text-lg font-semibold text-gray-800">--- ft</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="text-xs text-gray-500 font-medium uppercase">Speed</div>
-                        <div id="panelSpeed" class="text-lg font-semibold text-gray-800">--- kts</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="text-xs text-gray-500 font-medium uppercase">Heading</div>
-                        <div id="panelHeading" class="text-lg font-semibold text-gray-800">---°</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="text-xs text-gray-500 font-medium uppercase">Vertical Rate</div>
-                        <div id="panelVRate" class="text-lg font-semibold text-gray-800">--- ft/m</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="text-xs text-gray-500 font-medium uppercase">ICAO24</div>
-                        <div id="panelIcao" class="text-lg font-semibold text-sky-600">---</div>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-3">
-                        <div class="text-xs text-gray-500 font-medium uppercase">On Ground</div>
-                        <div id="panelGround" class="text-lg font-semibold text-gray-800">---</div>
+                <!-- Person Info (only for non-normal) -->
+                <div id="panelPersonRow" class="mb-4 hidden">
+                    <div id="panelPersonBox" class="rounded-lg p-3 border">
+                        <div class="flex items-center gap-2 mb-1">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                            </svg>
+                            <span id="panelPersonLabel" class="text-xs font-medium uppercase">Person</span>
+                        </div>
+                        <div id="panelPersonName" class="font-semibold">---</div>
+                        <div id="panelPersonReason" class="text-sm mt-1 opacity-80">---</div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- Heading indicator -->
-            <div class="relative w-20 h-20 bg-gray-50 rounded-full border-2 border-gray-200">
-                <div class="absolute inset-0 flex items-center justify-center text-[10px] font-medium text-gray-400">
-                    <span class="absolute top-1.5">N</span>
-                    <span class="absolute bottom-1.5">S</span>
-                    <span class="absolute left-1.5">W</span>
-                    <span class="absolute right-1.5">E</span>
+                
+                <!-- Flight Data Grid -->
+                <div class="grid grid-cols-4 gap-3">
+                    <div class="bg-apss-dark rounded-lg p-2.5">
+                        <div class="text-[10px] text-gray-500 uppercase">Altitude</div>
+                        <div id="panelAltitude" class="text-sm font-semibold text-white">---</div>
+                    </div>
+                    <div class="bg-apss-dark rounded-lg p-2.5">
+                        <div class="text-[10px] text-gray-500 uppercase">Speed</div>
+                        <div id="panelSpeed" class="text-sm font-semibold text-white">---</div>
+                    </div>
+                    <div class="bg-apss-dark rounded-lg p-2.5">
+                        <div class="text-[10px] text-gray-500 uppercase">Heading</div>
+                        <div id="panelHeading" class="text-sm font-semibold text-white">---</div>
+                    </div>
+                    <div class="bg-apss-dark rounded-lg p-2.5">
+                        <div class="text-[10px] text-gray-500 uppercase">V/Rate</div>
+                        <div id="panelVRate" class="text-sm font-semibold text-white">---</div>
+                    </div>
                 </div>
-                <div id="compassNeedle" class="absolute top-1/2 left-1/2 w-0.5 h-7 bg-sky-500 origin-bottom -translate-x-1/2 rounded-full" style="transform-origin: bottom center;"></div>
-                <div class="absolute top-1/2 left-1/2 w-2 h-2 bg-sky-500 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
             </div>
         </div>
     </div>
     
     <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 z-[100] bg-white flex items-center justify-center">
+    <div id="loadingOverlay" class="fixed inset-0 z-[3000] bg-apss-darker flex items-center justify-center">
         <div class="text-center">
-            <div class="w-16 h-16 mx-auto mb-4 float-animation">
-                <svg class="w-full h-full text-sky-500" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                </svg>
-            </div>
-            <p class="text-sky-600 font-semibold text-lg">Loading Flight Data</p>
-            <p class="text-gray-500 text-sm mt-1">Connecting to OpenSky Network...</p>
+            <div class="w-12 h-12 border-2 border-apss-accent border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-apss-accent font-medium">Loading Flight Data</p>
+            <p class="text-gray-500 text-sm mt-1">Connecting to data source...</p>
         </div>
     </div>
 
     <script>
-        // Map initialization
+        // Map initialization - Malaysia focus
         const map = L.map('map', {
-            center: [25, 105],
-            zoom: 4,
+            center: [4.5, 109],
+            zoom: 6,
             zoomControl: false,
             attributionControl: false
         });
         
-        // Light map tiles
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        // Dark map tiles
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
             maxZoom: 19
         }).addTo(map);
         
@@ -319,13 +321,13 @@
             blacklist: true
         };
         
-        // Category colors
+        // Category colors matching APSS theme
         const categoryColors = {
-            normal: '#0284c7',      // sky-600
-            whitelist: '#10b981',   // emerald-500
-            vip: '#f59e0b',         // amber-500
-            suspect: '#f97316',     // orange-500
-            blacklist: '#dc2626'    // red-600
+            normal: '#3b82f6',      // blue
+            whitelist: '#22c55e',   // green
+            vip: '#eab308',         // amber
+            suspect: '#f97316',     // orange
+            blacklist: '#ef4444'    // red
         };
         
         const categoryLabels = {
@@ -336,19 +338,18 @@
             blacklist: 'Blacklist'
         };
         
-        const categoryBgColors = {
-            normal: 'bg-sky-100 text-sky-700',
-            whitelist: 'bg-emerald-100 text-emerald-700',
-            vip: 'bg-amber-100 text-amber-700',
-            suspect: 'bg-orange-100 text-orange-700',
-            blacklist: 'bg-red-100 text-red-700'
+        const categoryStyles = {
+            normal: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+            whitelist: 'bg-green-500/20 text-green-400 border-green-500/30',
+            vip: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+            suspect: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+            blacklist: 'bg-red-500/20 text-red-400 border-red-500/30'
         };
         
-        // Simulated flight category database (randomized per session)
-        // In real app, this would come from backend
+        // Simulated flight category database
         const flightCategories = {};
         
-        // Dummy persons for each category with name and reason
+        // Dummy persons for each category
         const dummyPersons = {
             whitelist: [
                 { name: 'Ahmad Razali', reason: 'Verified government official' },
@@ -401,13 +402,10 @@
         };
         
         function getFlightCategory(icao24) {
-            // Check if already assigned
             if (flightCategories[icao24]) {
                 return flightCategories[icao24];
             }
             
-            // Random assignment with weighted distribution
-            // 70% normal, 12% whitelist, 8% vip, 7% suspect, 3% blacklist
             const rand = Math.random();
             let category, person = null;
             
@@ -431,26 +429,27 @@
             return flightCategories[icao24];
         }
         
-        // Region bounds - Asia
+        // Region bounds - Malaysia
         const regions = {
-            asia: { center: [25, 105], zoom: 4, bounds: [-10, 60, 55, 150] }
+            malaysia: { center: [4.5, 109], zoom: 6, bounds: [0.8, 99, 7.5, 119.5] }
         };
         
-        // Create aircraft icon with category color
-        function createAircraftIcon(heading, category, isSelected = false) {
-            const color = isSelected ? '#1f2937' : categoryColors[category];
-            const size = isSelected ? 28 : 22;
-            const glow = category === 'blacklist' ? 'filter: drop-shadow(0 0 6px rgba(220, 38, 38, 0.6));' : 
-                         category === 'suspect' ? 'filter: drop-shadow(0 0 4px rgba(249, 115, 22, 0.5));' :
-                         'filter: drop-shadow(0 2px 3px rgba(0,0,0,0.2));';
+        // Create aircraft icon for flights
+        function createFlightIcon(heading, category, isSelected = false) {
+            const color = categoryColors[category];
+            const size = isSelected ? 26 : 20;
+            const glow = category === 'blacklist' ? 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.8))' : 
+                         category === 'suspect' ? 'drop-shadow(0 0 6px rgba(249, 115, 22, 0.6))' :
+                         category === 'vip' ? 'drop-shadow(0 0 4px rgba(234, 179, 8, 0.4))' :
+                         'drop-shadow(0 2px 3px rgba(0,0,0,0.3))';
             
             return L.divIcon({
                 html: `
-                    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" class="aircraft-marker" style="transform: rotate(${(heading || 0) + 45}deg); ${glow}">
+                    <svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="${color}" style="transform: rotate(${(heading || 0) + 45}deg); filter: ${glow};">
                         <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
                     </svg>
                 `,
-                className: '',
+                className: 'aircraft-icon',
                 iconSize: [size, size],
                 iconAnchor: [size/2, size/2]
             });
@@ -468,12 +467,11 @@
         
         // Initialize dummy flights once
         function initDummyFlights() {
-            const airlines = ['MAS', 'AXM', 'SIA', 'CPA', 'JAL', 'ANA', 'KAL', 'CES', 'CSN', 'THA', 'VNA', 'GIA', 'PAL', 'EVA', 'CAL', 'QTR', 'UAE', 'ETD', 'SLK', 'AIJ'];
-            const countries = ['Malaysia', 'Singapore', 'Thailand', 'Indonesia', 'China', 'Japan', 'South Korea', 'India', 'Vietnam', 'Philippines', 'Taiwan', 'Hong Kong', 'UAE', 'Qatar', 'Australia'];
+            const airlines = ['MAS', 'AXM', 'MXD', 'FYS', 'ODB', 'XAX', 'BTK'];
+            const countries = ['Malaysia', 'Singapore', 'Thailand', 'Indonesia', 'China', 'Australia', 'Japan'];
             const flights = [];
             
-            // Generate 80-120 random flights across Asia
-            const numFlights = 80 + Math.floor(Math.random() * 40);
+            const numFlights = 25 + Math.floor(Math.random() * 15);
             
             for (let i = 0; i < numFlights; i++) {
                 const airline = airlines[Math.floor(Math.random() * airlines.length)];
@@ -481,12 +479,11 @@
                 const callsign = `${airline}${flightNum}`;
                 const icao24 = Math.random().toString(16).substr(2, 6);
                 
-                // Random position within Asia bounds
-                const lat = -10 + Math.random() * 65; // -10 to 55
-                const lon = 60 + Math.random() * 90; // 60 to 150
+                const lat = 1 + Math.random() * 6;
+                const lon = 100 + Math.random() * 18;
                 
-                const altitude = Math.random() > 0.1 ? 5000 + Math.random() * 35000 : 0; // 10% on ground
-                const velocity = altitude > 0 ? 150 + Math.random() * 400 : 0; // knots
+                const altitude = Math.random() > 0.1 ? 5000 + Math.random() * 35000 : 0;
+                const velocity = altitude > 0 ? 150 + Math.random() * 400 : 0;
                 const track = Math.random() * 360;
                 const vRate = altitude > 0 ? (Math.random() - 0.5) * 20 : 0;
                 const onGround = altitude === 0;
@@ -498,10 +495,10 @@
                     country,
                     lat,
                     lon,
-                    altitude, // feet
-                    velocity, // knots
-                    track,    // degrees
-                    vRate,    // ft/min
+                    altitude,
+                    velocity,
+                    track,
+                    vRate,
                     onGround
                 });
             }
@@ -509,7 +506,6 @@
             return flights;
         }
         
-        // Update flight positions based on elapsed time
         function updateDummyFlights() {
             if (!dummyFlightsData) {
                 dummyFlightsData = initDummyFlights();
@@ -521,61 +517,37 @@
             const deltaSeconds = (now - lastUpdateTime) / 1000;
             lastUpdateTime = now;
             
-            // Update each flight position
             dummyFlightsData = dummyFlightsData.map(flight => {
                 if (flight.onGround) return flight;
                 
-                // Calculate movement based on heading and speed
-                // 1 knot ≈ 0.0003 degrees per second at equator
                 const speedDegPerSec = (flight.velocity * 0.0003);
                 const distance = speedDegPerSec * deltaSeconds;
-                
-                // Convert heading to radians
                 const headingRad = flight.track * (Math.PI / 180);
                 
-                // Update position
                 let newLat = flight.lat + (distance * Math.cos(headingRad));
                 let newLon = flight.lon + (distance * Math.sin(headingRad));
                 
-                // Check bounds - if out of Malaysia, wrap around or reverse
-                const [lamin, lomin, lamax, lomax] = regions.asia.bounds;
+                const [lamin, lomin, lamax, lomax] = regions.malaysia.bounds;
                 
                 if (newLat < lamin || newLat > lamax || newLon < lomin || newLon > lomax) {
-                    // Re-enter from opposite side or random edge
                     if (newLat < lamin) newLat = lamax - 0.5;
                     if (newLat > lamax) newLat = lamin + 0.5;
                     if (newLon < lomin) newLon = lomax - 0.5;
                     if (newLon > lomax) newLon = lomin + 0.5;
-                    
-                    // Randomize heading slightly when wrapping
                     flight.track = Math.random() * 360;
                 }
                 
-                return {
-                    ...flight,
-                    lat: newLat,
-                    lon: newLon
-                };
+                return { ...flight, lat: newLat, lon: newLon };
             });
             
             return getDummyFlightsAsStates();
         }
         
-        // Convert stored flights to OpenSky API format
         function getDummyFlightsAsStates() {
             return dummyFlightsData.map(f => [
-                f.icao24,           // 0: icao24
-                f.callsign,         // 1: callsign
-                f.country,          // 2: origin_country
-                Date.now()/1000,    // 3: time_position
-                Date.now()/1000,    // 4: last_contact
-                f.lon,              // 5: longitude
-                f.lat,              // 6: latitude
-                f.altitude * 0.3048,// 7: baro_altitude (convert ft to m)
-                f.onGround,         // 8: on_ground
-                f.velocity * 0.514, // 9: velocity (convert kts to m/s)
-                f.track,            // 10: true_track
-                f.vRate * 0.00508   // 11: vertical_rate (convert ft/min to m/s)
+                f.icao24, f.callsign, f.country, Date.now()/1000, Date.now()/1000,
+                f.lon, f.lat, f.altitude * 0.3048, f.onGround,
+                f.velocity * 0.514, f.track, f.vRate * 0.00508
             ]);
         }
         
@@ -583,59 +555,41 @@
         const OPENSKY_USERNAME = 'ceks98';
         const OPENSKY_PASSWORD = 'az8eOP6uVvbQDPrVo0wqrMvLPVZitXV7';
         
-        // Fetch flight data from OpenSky Network - Malaysia region
         async function fetchFlights() {
-            const [lamin, lomin, lamax, lomax] = regions.asia.bounds;
-            // Use CORS proxy for browser requests
+            const [lamin, lomin, lamax, lomax] = regions.malaysia.bounds;
             const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
             const url = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
             
-            // Create basic auth header
-            const authHeader = 'Basic ' + btoa(`${OPENSKY_USERNAME}:${OPENSKY_PASSWORD}`);
-            
             try {
                 console.log('Fetching from OpenSky API via proxy...');
-                // Note: CORS proxy may not forward auth headers, but provides higher rate limits anyway
                 const response = await fetch(url);
                 
                 console.log('Response status:', response.status);
                 
                 if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('API Error:', response.status, errorText);
                     throw new Error(`API request failed: ${response.status}`);
                 }
                 
                 const data = await response.json();
-                console.log('API Response:', data);
                 const flights = data.states || [];
                 
-                // If no real flights, use simulated data
                 if (flights.length === 0) {
                     console.log('No flights in Malaysia airspace, using simulated flights');
                     updateDataSourceStatus(false, 'No flights in area');
                     return updateDummyFlights();
                 }
                 
-                // Clear dummy data if we have real flights
                 dummyFlightsData = null;
                 updateDataSourceStatus(true);
                 console.log(`Fetched ${flights.length} real flights`);
                 return flights;
             } catch (error) {
                 console.error('Fetch error:', error.message);
-                // Check if it's a CORS error
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    console.error('Likely CORS issue - browser blocking request');
-                    updateDataSourceStatus(false, 'CORS blocked');
-                } else {
-                    updateDataSourceStatus(false, error.message);
-                }
+                updateDataSourceStatus(false, error.message);
                 return updateDummyFlights();
             }
         }
         
-        // Update status indicator
         function updateDataSourceStatus(isRealData, reason = '') {
             const dot = document.getElementById('statusDot');
             const text = document.getElementById('statusText');
@@ -643,26 +597,21 @@
             if (isRealData) {
                 dot.className = 'w-2 h-2 bg-green-500 rounded-full animate-pulse';
                 text.textContent = 'Live';
-                text.className = 'text-sm font-medium text-green-600';
-                text.title = 'Real data from OpenSky Network';
+                text.className = 'text-sm text-green-400';
             } else {
                 dot.className = 'w-2 h-2 bg-amber-500 rounded-full animate-pulse';
                 text.textContent = 'Simulated';
-                text.className = 'text-sm font-medium text-amber-600';
-                text.title = reason || 'Using simulated flight data';
+                text.className = 'text-sm text-amber-400';
             }
+            text.title = reason || '';
         }
         
-        // Update map with flight data
         async function refreshData() {
-            const refreshIcon = document.getElementById('refreshIcon');
-            refreshIcon.classList.add('animate-spin');
-            
             const flights = await fetchFlights();
             aircraftLayer.clearLayers();
             
-            // Category counters
             const counts = { normal: 0, whitelist: 0, vip: 0, suspect: 0, blacklist: 0 };
+            let alertCount = 0;
             
             flights.forEach(state => {
                 const [icao24, callsign, country, timePos, lastContact, lon, lat, baroAlt, onGround, velocity, track, vRate] = state;
@@ -671,14 +620,14 @@
                     const { category, person } = getFlightCategory(icao24);
                     counts[category]++;
                     
-                    // Skip if category is hidden
+                    if (category === 'blacklist' || category === 'suspect') {
+                        alertCount++;
+                    }
+                    
                     if (!categoryVisibility[category]) return;
                     
                     const isSelected = selectedFlight && selectedFlight.icao24 === icao24;
-                    const marker = L.marker([lat, lon], {
-                        icon: createAircraftIcon(track, category, isSelected),
-                        zIndexOffset: category === 'blacklist' ? 1000 : category === 'suspect' ? 500 : 0
-                    });
+                    const heading = track ? track : 0;
                     
                     const flightData = {
                         icao24,
@@ -696,22 +645,24 @@
                         onGround
                     };
                     
+                    const marker = L.marker([lat, lon], {
+                        icon: createFlightIcon(heading, category, isSelected),
+                        zIndexOffset: category === 'blacklist' ? 1000 : category === 'suspect' ? 500 : 0
+                    });
+                    
                     marker.on('click', () => selectFlight(flightData));
                     
-                    const categoryBadge = `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryBgColors[category]}">${categoryLabels[category]}</span>`;
+                    const categoryBadge = `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryStyles[category]}">${categoryLabels[category]}</span>`;
                     
                     marker.bindTooltip(`
                         <div class="p-2">
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="font-bold text-gray-800">${flightData.callsign}</span>
+                                <span class="font-bold text-white">${flightData.callsign}</span>
                                 ${categoryBadge}
                             </div>
-                            <div class="text-xs text-gray-500">${flightData.altitude ? flightData.altitude.toLocaleString() + ' ft' : 'Ground'}</div>
+                            <div class="text-xs text-gray-400">${flightData.altitude ? flightData.altitude.toLocaleString() + ' ft' : 'Ground'}</div>
                         </div>
-                    `, {
-                        direction: 'top',
-                        offset: [0, -10]
-                    });
+                    `, { direction: 'top', offset: [0, -10] });
                     
                     aircraftLayer.addLayer(marker);
                     
@@ -721,16 +672,17 @@
                 }
             });
             
-            // Update counts in UI
-            document.getElementById('aircraftCount').textContent = flights.length.toLocaleString();
+            // Update stats
+            document.getElementById('aircraftCount').textContent = flights.length;
+            document.getElementById('alertCount').textContent = alertCount;
             document.getElementById('countNormal').textContent = counts.normal;
             document.getElementById('countWhitelist').textContent = counts.whitelist;
             document.getElementById('countVip').textContent = counts.vip;
             document.getElementById('countSuspect').textContent = counts.suspect;
             document.getElementById('countBlacklist').textContent = counts.blacklist;
             document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+            document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-GB');
             
-            refreshIcon.classList.remove('animate-spin');
             document.getElementById('loadingOverlay').classList.add('hidden');
         }
         
@@ -745,19 +697,18 @@
         function updatePanel(data) {
             document.getElementById('panelCallsign').textContent = data.callsign;
             document.getElementById('panelCountry').textContent = data.country;
+            document.getElementById('panelIcao').textContent = data.icao24.toUpperCase();
             document.getElementById('panelAltitude').textContent = data.altitude ? `${data.altitude.toLocaleString()} ft` : 'Ground';
             document.getElementById('panelSpeed').textContent = data.speed ? `${data.speed} kts` : '---';
             document.getElementById('panelHeading').textContent = data.heading !== null ? `${data.heading}°` : '---';
-            document.getElementById('panelVRate').textContent = data.vRate ? `${data.vRate > 0 ? '+' : ''}${data.vRate} ft/m` : '---';
-            document.getElementById('panelIcao').textContent = data.icao24.toUpperCase();
-            document.getElementById('panelGround').textContent = data.onGround ? 'Yes' : 'No';
+            document.getElementById('panelVRate').textContent = data.vRate ? `${data.vRate > 0 ? '+' : ''}${data.vRate}` : '---';
             
-            // Update category badge
+            // Category badge
             const categoryEl = document.getElementById('panelCategory');
             categoryEl.textContent = categoryLabels[data.category];
-            categoryEl.className = `ml-auto text-sm font-semibold px-3 py-1 rounded-full ${categoryBgColors[data.category]}`;
+            categoryEl.className = `text-xs font-medium px-2 py-0.5 rounded ${categoryStyles[data.category]}`;
             
-            // Update person info display
+            // Person info
             const personRow = document.getElementById('panelPersonRow');
             const personBox = document.getElementById('panelPersonBox');
             const personLabel = document.getElementById('panelPersonLabel');
@@ -769,77 +720,30 @@
                 personNameEl.textContent = data.personName;
                 personReasonEl.textContent = data.personReason;
                 
-                // Style based on category
                 const personStyles = {
-                    whitelist: {
-                        box: 'bg-emerald-50 border-emerald-200',
-                        label: 'text-emerald-600',
-                        name: 'text-emerald-800',
-                        reason: 'text-emerald-700',
-                        labelText: 'Whitelisted Person'
-                    },
-                    vip: {
-                        box: 'bg-amber-50 border-amber-200',
-                        label: 'text-amber-600',
-                        name: 'text-amber-800',
-                        reason: 'text-amber-700',
-                        labelText: 'VIP Passenger'
-                    },
-                    suspect: {
-                        box: 'bg-orange-50 border-orange-300',
-                        label: 'text-orange-600',
-                        name: 'text-orange-800',
-                        reason: 'text-orange-700',
-                        labelText: 'Suspect'
-                    },
-                    blacklist: {
-                        box: 'bg-red-50 border-red-300',
-                        label: 'text-red-600',
-                        name: 'text-red-800',
-                        reason: 'text-red-700',
-                        labelText: 'Blacklisted Person'
-                    }
+                    whitelist: { box: 'bg-green-500/10 border-green-500/30 text-green-400', label: 'Whitelisted' },
+                    vip: { box: 'bg-amber-500/10 border-amber-500/30 text-amber-400', label: 'VIP' },
+                    suspect: { box: 'bg-orange-500/10 border-orange-500/30 text-orange-400', label: 'Suspect' },
+                    blacklist: { box: 'bg-red-500/10 border-red-500/30 text-red-400', label: 'Blacklisted' }
                 };
                 
                 const style = personStyles[data.category];
-                personBox.className = `rounded-lg p-3 border-2 ${style.box}`;
-                personLabel.className = `text-xs font-medium uppercase mb-1 ${style.label}`;
-                personLabel.textContent = style.labelText;
-                personNameEl.className = `text-base font-bold ${style.name}`;
-                personReasonEl.className = `text-sm ${style.reason}`;
+                personBox.className = `rounded-lg p-3 border ${style.box}`;
+                personLabel.textContent = style.label;
             } else {
                 personRow.classList.add('hidden');
             }
             
-            // Update icon background based on category
+            // Icon color
             const iconEl = document.getElementById('panelIcon');
-            const iconBg = {
-                normal: 'bg-sky-100',
-                whitelist: 'bg-emerald-100',
-                vip: 'bg-amber-100',
-                suspect: 'bg-orange-100',
-                blacklist: 'bg-red-100'
+            const iconColors = {
+                normal: 'bg-blue-500/20 text-blue-400',
+                whitelist: 'bg-green-500/20 text-green-400',
+                vip: 'bg-amber-500/20 text-amber-400',
+                suspect: 'bg-orange-500/20 text-orange-400',
+                blacklist: 'bg-red-500/20 text-red-400'
             };
-            const iconText = {
-                normal: 'text-sky-600',
-                whitelist: 'text-emerald-600',
-                vip: 'text-amber-600',
-                suspect: 'text-orange-600',
-                blacklist: 'text-red-600'
-            };
-            iconEl.className = `w-10 h-10 ${iconBg[data.category]} rounded-full flex items-center justify-center`;
-            iconEl.querySelector('svg').className = `w-5 h-5 ${iconText[data.category]}`;
-            
-            // Pulse effect for dangerous categories
-            const panelEl = document.getElementById('flightPanel');
-            if (data.category === 'blacklist') {
-                panelEl.classList.add('pulse-danger', 'border-red-200');
-            } else {
-                panelEl.classList.remove('pulse-danger', 'border-red-200');
-            }
-            
-            const needle = document.getElementById('compassNeedle');
-            needle.style.transform = `translateX(-50%) rotate(${data.heading || 0}deg)`;
+            iconEl.className = `w-10 h-10 ${iconColors[data.category]} rounded-lg flex items-center justify-center`;
         }
         
         function closePanel() {
@@ -860,7 +764,6 @@
                 refreshTimer = setInterval(refreshData, interval);
             }
         }
-        
         
         document.addEventListener('DOMContentLoaded', () => {
             refreshData();
