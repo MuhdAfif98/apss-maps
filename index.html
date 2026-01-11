@@ -539,16 +539,6 @@
         </div>
     </div>
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="fixed inset-0 z-[3000] bg-white flex items-center justify-center">
-        <div class="text-center">
-            <div class="w-12 h-12 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4">
-            </div>
-            <p class="text-blue-600 font-medium">Loading M-APSS Data</p>
-            <p class="text-gray-500 text-sm mt-1">Connecting to data source...</p>
-        </div>
-    </div>
-
     <script>
         // Map initialization - Malaysia focus
         const map = L.map('map', {
@@ -921,8 +911,6 @@
             document.getElementById('countSuspect').textContent = counts.suspect;
             document.getElementById('countBlacklist').textContent = counts.blacklist;
             document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-GB');
-
-            document.getElementById('loadingOverlay').classList.add('hidden');
         }
 
         function selectFlight(flightData) {
