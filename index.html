@@ -560,6 +560,7 @@
         let aircraftLayer = L.layerGroup().addTo(map);
         let refreshTimer = null;
         let selectedFlight = null;
+        let flightMarkers = {}; // Track markers by icao24
 
         // Category visibility
         const categoryVisibility = {
@@ -806,42 +807,44 @@
 
         async function fetchFlights() {
             const [lamin, lomin, lamax, lomax] = regions.malaysia.bounds;
-            const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}`;
+            // Add timestamp to prevent caching
+            const timestamp = Date.now();
+            const apiUrl = `https://opensky-network.org/api/states/all?lamin=${lamin}&lomin=${lomin}&lamax=${lamax}&lomax=${lomax}&_=${timestamp}`;
             const url = `https://corsproxy.io/?${encodeURIComponent(apiUrl)}`;
 
             try {
-                console.log('Fetching from OpenSky API via proxy...');
-                const response = await fetch(url);
-
-                console.log('Response status:', response.status);
+                const response = await fetch(url, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache'
+                    }
+                });
 
                 if (!response.ok) {
-                    throw new Error(`API request failed: ${response.status}`);
+                    console.error(`API request failed: ${response.status}`);
+                    return [];
                 }
 
                 const data = await response.json();
                 const flights = data.states || [];
 
                 if (flights.length === 0) {
-                    console.log('No flights in Malaysia airspace, using simulated flights');
-                    return updateDummyFlights();
+                    return [];
                 }
 
-                dummyFlightsData = null;
-                console.log(`Fetched ${flights.length} real flights`);
                 return flights;
             } catch (error) {
                 console.error('Fetch error:', error.message);
-                return updateDummyFlights();
+                return [];
             }
         }
 
         async function refreshData() {
             const flights = await fetchFlights();
-            aircraftLayer.clearLayers();
 
             const counts = { normal: 0, whitelist: 0, vip: 0, suspect: 0, blacklist: 0 };
             let alertCount = 0;
+            const currentFlightIds = new Set();
 
             flights.forEach(state => {
                 const [icao24, callsign, country, timePos, lastContact, lon, lat, baroAlt, onGround, velocity, track, vRate] = state;
@@ -856,6 +859,7 @@
 
                     if (!categoryVisibility[category]) return;
 
+                    currentFlightIds.add(icao24);
                     const isSelected = selectedFlight && selectedFlight.icao24 === icao24;
                     const heading = track ? track : 0;
 
@@ -875,30 +879,70 @@
                         onGround
                     };
 
-                    const marker = L.marker([lat, lon], {
-                        icon: createFlightIcon(heading, category, isSelected),
-                        zIndexOffset: category === 'blacklist' ? 1000 : category === 'suspect' ? 500 : 0
-                    });
-
-                    marker.on('click', () => selectFlight(flightData));
-
-                    const categoryBadge = `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryStyles[category]}">${categoryLabels[category]}</span>`;
-
-                    marker.bindTooltip(`
-                        <div class="p-2">
-                            <div class="flex items-center gap-2 mb-1">
-                                <span class="font-bold text-gray-900">${flightData.callsign}</span>
-                                ${categoryBadge}
+                    // Update existing marker or create new one
+                    if (flightMarkers[icao24]) {
+                        const marker = flightMarkers[icao24];
+                        const currentPos = marker.getLatLng();
+                        const newPos = [lat, lon];
+                        
+                        // Update position - setLatLng will handle the movement
+                        marker.setLatLng(newPos);
+                        
+                        // Update icon (heading might have changed)
+                        marker.setIcon(createFlightIcon(heading, category, isSelected));
+                        
+                        // Update tooltip
+                        const categoryBadge = `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryStyles[category]}">${categoryLabels[category]}</span>`;
+                        marker.unbindTooltip();
+                        marker.bindTooltip(`
+                            <div class="p-2">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-bold text-gray-900">${flightData.callsign}</span>
+                                    ${categoryBadge}
+                                </div>
+                                <div class="text-xs text-gray-600">${flightData.altitude ? flightData.altitude.toLocaleString() + ' ft' : 'Ground'}</div>
                             </div>
-                            <div class="text-xs text-gray-600">${flightData.altitude ? flightData.altitude.toLocaleString() + ' ft' : 'Ground'}</div>
-                        </div>
-                    `, { direction: 'top', offset: [0, -10] });
+                        `, { direction: 'top', offset: [0, -10] });
+                        
+                        // Update click handler with fresh data
+                        marker.off('click');
+                        marker.on('click', () => selectFlight(flightData));
+                    } else {
+                        // Create new marker
+                        const marker = L.marker([lat, lon], {
+                            icon: createFlightIcon(heading, category, isSelected),
+                            zIndexOffset: category === 'blacklist' ? 1000 : category === 'suspect' ? 500 : 0
+                        });
 
-                    aircraftLayer.addLayer(marker);
+                        marker.on('click', () => selectFlight(flightData));
+
+                        const categoryBadge = `<span class="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${categoryStyles[category]}">${categoryLabels[category]}</span>`;
+
+                        marker.bindTooltip(`
+                            <div class="p-2">
+                                <div class="flex items-center gap-2 mb-1">
+                                    <span class="font-bold text-gray-900">${flightData.callsign}</span>
+                                    ${categoryBadge}
+                                </div>
+                                <div class="text-xs text-gray-600">${flightData.altitude ? flightData.altitude.toLocaleString() + ' ft' : 'Ground'}</div>
+                            </div>
+                        `, { direction: 'top', offset: [0, -10] });
+
+                        aircraftLayer.addLayer(marker);
+                        flightMarkers[icao24] = marker;
+                    }
 
                     if (isSelected) {
                         updatePanel(flightData);
                     }
+                }
+            });
+
+            // Remove markers for flights that are no longer in the data
+            Object.keys(flightMarkers).forEach(icao24 => {
+                if (!currentFlightIds.has(icao24)) {
+                    aircraftLayer.removeLayer(flightMarkers[icao24]);
+                    delete flightMarkers[icao24];
                 }
             });
 
